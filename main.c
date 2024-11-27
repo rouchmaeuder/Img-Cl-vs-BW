@@ -82,13 +82,16 @@ FILE *fptr;
 
 float ***pixelData = NULL;
 
-unsigned char freadchar(FILE *file, unsigned long offset);
-unsigned int freadint(FILE *file, unsigned long offset);
-unsigned long freadlong(FILE *file, unsigned long offset);
-unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry);
-unsigned long IFDReadEntry(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, unsigned int IFD_Entry_count, unsigned int tag);
-unsigned long fillLongInt(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen);
-void printStatusBar(unsigned char input);
+unsigned char freadchar(FILE *file, unsigned long offset);																	   // Reads a unsigned char out of a file at a specified offset within
+unsigned int freadint(FILE *file, unsigned long offset);																	   // Reads a unsigned integer out of a file at a specified offset within
+unsigned long freadlong(FILE *file, unsigned long offset);																	   // Reads a unsigned long out of a file at a specified offset within
+unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry);															   // Reads up to a unsigned long out of an IFD
+unsigned long IFDReadEntry(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, unsigned int IFD_Entry_count, unsigned int tag); // Reads up to a unsigned long out of an IFD with a specified tag out of an array of IFD_entry types
+unsigned long fillLongInt(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen);				   // deprecated method to uncompress back to back data compression
+void printStatusBar(unsigned char input);																					   // takes a unsigned char from 0 to 100 as a percentage
+signed long limit(signed long input, signed long lower, signed long upper);
+
+float totalContrast(float **image, float radius); // calculate contrast
 
 void main(void)
 {
@@ -100,140 +103,50 @@ void main(void)
 		errorflags |= 0x01;
 	}
 
-	if (!(errorflags)) // check for endianness (necessary to check for tiff flag as it is influenced by endianness too)
-	{
-		printf("file opened \n");
-		if (getc(fptr) != 0x49)
+	if (!(errorflags))	   // check for endianness (necessary to check for tiff flag as it is influenced by endianness too)
+		if (!(errorflags)) // print data compression
 		{
-			printf("file is in big endian. this is currently not supported \n");
-			errorflags |= 0x04;
-		}
-	}
-
-	if (errorflags & ~0x0001) // check for tiff/dnf flag
-	{
-		if (freadchar(fptr, 2))
-		{
-			printf("this file does not conform to tiff/dnf \n");
-			errorflags |= 0x02;
-		}
-	}
-
-	if (!(errorflags)) // parse IFD length and allocate memory to mirror
-	{
-		for (unsigned char i = 0; i < 4; i++)
-		{
-			IFD_index_offset |= (freadchar(fptr, (4 + i)) << (i * 8));
-		}
-
-		IFD_entries = freadint(fptr, IFD_index_offset);
-
-		IFD_arr_ptr = (struct IFD_Entry *)malloc(sizeof(struct IFD_Entry) * freadchar(fptr, IFD_index_offset));
-
-		if (IFD_arr_ptr == NULL)
-		{
-			printf("IFD arr memory could not be allocated \n");
-			errorflags |= 0x08;
-		}
-	}
-
-	if (!(errorflags)) // parse IFD and mirror tag datatype and datalocation
-	{
-		for (unsigned int i = 0; i < IFD_entries; i++)
-		{
-			IFD_arr_ptr[i].tag = freadint(fptr, IFD_index_offset + 2 + (12 * i));
-
-			IFD_arr_ptr[i].type = freadint(fptr, IFD_index_offset + 4 + (12 * i));
-
-			IFD_arr_ptr[i].data_arr_len = freadlong(fptr, IFD_index_offset + 6 + (12 * i));
-
-			if (data_unit_len[IFD_arr_ptr[i].type] * IFD_arr_ptr[i].data_arr_len <= 4)
+			for (unsigned int i = 0; i < IFD_entries; i++)
 			{
-				IFD_arr_ptr[i].data_offset = IFD_index_offset + 10 + (12 * i);
-			}
-			else
-			{
-				IFD_arr_ptr[i].data_offset = freadlong(fptr, IFD_index_offset + 10 + (12 * i));
-			}
-		}
-	}
-
-#ifdef VERBOSE
-	if (!(errorflags)) // parse and print IFD entries
-	{
-		for (unsigned int i = 0; i < IFD_entries; i++)
-		{
-			printf("IFD entry Nr. %i \n", i);
-			printf("IFD tag %i \n", IFD_arr_ptr[i].tag);
-			printf("array is %li long\n", IFD_arr_ptr[i].data_arr_len);
-			printf("datatype is");
-
-			if (IFD_arr_ptr[i].type == 2 || (IFD_arr_ptr[i].data_arr_len >= 3 && IFD_arr_ptr[i].data_arr_len <= 50)) // check that string is between 3 and 50 chars long (this is to not print possible classification letters or long html stuff)
-			{
-				char string[(IFD_arr_ptr[i].data_arr_len) + 1];
-				for (unsigned int y = 0; y < IFD_arr_ptr[i].data_arr_len; y++)
+				if (IFD_arr_ptr[i].tag == 259) // if tag == compression type
 				{
-					string[y] = freadchar(fptr, IFD_arr_ptr[i].data_offset + y);
-				}
-				string[IFD_arr_ptr[i].data_arr_len] = '\0';
-				printf(" string with contents: ");
-				printf("%s", string);
-				printf("\n");
-			}
-			else
-			{
-				printf(" 0x%04x ", IFD_arr_ptr[i].type);
-				printf("at adress 0x%08lx \n", IFD_arr_ptr[i].data_offset);
-			}
+					compression_Type = freadint(fptr, IFD_arr_ptr[i].data_offset);
+					i = 0xfffe; // for exit statement
+					switch (compression_Type)
+					{
+					case backTobackData:
+						printf("encoding type is backtoback data. \nthis file is readable \n");
+						break;
 
-			printf("\n");
-		}
-	}
-#endif
+					case huffmanRunlength:
+						printf("this file is huffman encoded and tha data is thus not supported");
+						errorflags |= 0x08;
+						break;
 
-	if (!(errorflags)) // print data compression
-	{
-		for (unsigned int i = 0; i < IFD_entries; i++)
-		{
-			if (IFD_arr_ptr[i].tag == 259) // if tag == compression type
-			{
-				compression_Type = freadint(fptr, IFD_arr_ptr[i].data_offset);
-				i = 0xfffe; // for exit statement
-				switch (compression_Type)
-				{
-				case backTobackData:
-					printf("encoding type is backtoback data. \nthis file is readable \n");
-					break;
+					case bitPacking:
+						printf("the encoding type bitpacking encoding is currently not supported");
+						errorflags |= 0x08;
+						break;
 
-				case huffmanRunlength:
-					printf("this file is huffman encoded and tha data is thus not supported");
-					errorflags |= 0x08;
-					break;
-
-				case bitPacking:
-					printf("the encoding type bitpacking encoding is currently not supported");
-					errorflags |= 0x08;
-					break;
-
-				default:
-					printf("compression type unknown. compression type nr is 0x%04x \n", compression_Type);
-					break;
+					default:
+						printf("compression type unknown. compression type nr is 0x%04x \n", compression_Type);
+						break;
+					}
 				}
 			}
 		}
-	}
 
 	if (!(errorflags)) // parse data strippattern
 	{
 		unsigned int stripCount = 0;
-		unsigned int BitsPerSample 		= (unsigned int)IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 258);
-		unsigned long hLinesPerStrip 	= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 278); // tag 278
-		unsigned long StripOffsets 		= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 273); // tag 273
-		unsigned long StripByteCount 	= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 279); // tag 279
-		SamplesPerPixel 				= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 277);
-		hResolution 					= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 256);
-		vResolution 					= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 257);
-		unsigned int perRowBytes 		= (hResolution * SamplesPerPixel * BitsPerSample / 8);
+		unsigned int BitsPerSample = (unsigned int)IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 258);
+		unsigned long hLinesPerStrip = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 278); // tag 278
+		unsigned long StripOffsets = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 273);	  // tag 273
+		unsigned long StripByteCount = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 279); // tag 279
+		SamplesPerPixel = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 277);
+		hResolution = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 256);
+		vResolution = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 257);
+		unsigned int perRowBytes = (hResolution * SamplesPerPixel * BitsPerSample / 8);
 
 		for (unsigned int i = 0; i < IFD_entries; i++)
 		{
@@ -244,12 +157,12 @@ void main(void)
 		}
 
 #ifdef VERBOSE
-			printf("the image is %li", hResolution);
-			printf("x %li pixels large ", vResolution);
-			printf("and split into %i chunk(s) \n", stripCount);
+		printf("the image is %li", hResolution);
+		printf("x %li pixels large ", vResolution);
+		printf("and split into %i chunk(s) \n", stripCount);
 #endif
-			printf("bits per sample 0x%04x \n", BitsPerSample);
-			printf("with %i samples per pixel\n", SamplesPerPixel);
+		printf("bits per sample 0x%04x \n", BitsPerSample);
+		printf("with %i samples per pixel\n", SamplesPerPixel);
 
 		if (stripCount > 1)
 		{
@@ -296,7 +209,7 @@ void main(void)
 						}
 
 						LeftJustifiedSubpixelLuminocity &= (0xffffffff << (32 - BitsPerSample));
-						pixelData[sample][x][y] = (float)LeftJustifiedSubpixelLuminocity / (float) 0xffffffff;
+						pixelData[sample][x][y] = (float)LeftJustifiedSubpixelLuminocity / (float)0xffffffff;
 					}
 				}
 				printf("\r");
@@ -369,6 +282,11 @@ void main(void)
 		}
 	}
 
+	if (!(errorflags)) // evaluate
+	{
+//		printf("total contrast is %f\n", totalContrast(pixelData[1], 0.1));
+	}
+
 	if (!(errorflags & ~0x01)) // freeing memory
 	{
 		free(IFD_arr_ptr);
@@ -389,18 +307,18 @@ void main(void)
 	printf("program ended with exitcode 0x%04x \n", errorflags);
 }
 
-unsigned char 	freadchar		(FILE *file, unsigned long offset)
+unsigned char freadchar(FILE *file, unsigned long offset)
 {
 	fseek(file, offset, SEEK_SET);
 	return getc(file);
 }
 
-unsigned int 	freadint		(FILE *file, unsigned long offset)
+unsigned int freadint(FILE *file, unsigned long offset)
 {
 	return (unsigned int)freadchar(file, offset) | ((unsigned int)freadchar(file, offset + 1) << 8);
 }
 
-unsigned long 	freadlong		(FILE *file, unsigned long offset)
+unsigned long freadlong(FILE *file, unsigned long offset)
 {
 	return (((unsigned long)freadchar(file, offset)) |
 			((unsigned int)freadchar(file, offset + 1) << 8) |
@@ -408,7 +326,7 @@ unsigned long 	freadlong		(FILE *file, unsigned long offset)
 			((unsigned int)freadchar(file, offset + 3) << 24));
 }
 
-unsigned long 	IFDReadInteger	(FILE *file, struct IFD_Entry Entry)
+unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry)
 {
 	if (Entry.type == BYTE_TYPE)
 	{
@@ -426,7 +344,7 @@ unsigned long 	IFDReadInteger	(FILE *file, struct IFD_Entry Entry)
 	return 0;
 }
 
-unsigned long 	IFDReadEntry	(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, unsigned int IFD_Entry_count, unsigned int tag)
+unsigned long IFDReadEntry(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, unsigned int IFD_Entry_count, unsigned int tag)
 {
 	for (unsigned int i = 0; i < IFD_Entry_count; i++)
 	{
@@ -438,7 +356,7 @@ unsigned long 	IFDReadEntry	(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, 
 	return 0;
 }
 
-unsigned long 	fillLongInt		(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen)
+unsigned long fillLongInt(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen)
 {
 	unsigned long tempval = 0;
 	for (unsigned char i = 0; i < 5; i++)
@@ -448,7 +366,7 @@ unsigned long 	fillLongInt		(FILE *file, unsigned long ZoneOffset, unsigned long
 	return tempval | ~(0xffffffff << bitlen);
 }
 
-void 			printStatusBar	(unsigned char input)
+void printStatusBar(unsigned char input)
 {
 	printf("[");
 	for (unsigned int i = 0; i < 50; i++)
@@ -463,4 +381,52 @@ void 			printStatusBar	(unsigned char input)
 		}
 	}
 	printf("]");
+}
+
+float totalContrast(float **image, float radius)
+{
+	unsigned int frame = radius * hResolution;
+	float returnval = 0;
+	for (unsigned long x = 0; x < hResolution; x++)
+	{
+		for (unsigned long y = 0; y < vResolution; y++)
+		{
+			// loops over every pixel
+			float arrMax = -100;
+			float arrMin = 100;
+			for (signed int testarrX = -(frame / 2); testarrX < (frame / 2); testarrX++)
+			{
+				for (signed int testarrY = -(frame / 2); testarrY < (frame / 2); testarrY++)
+				{
+					float tempval = image[limit(x+testarrX, 0, hResolution)][limit(y+testarrY, 0, vResolution)];
+					if (tempval < arrMin)
+					{
+						arrMin = tempval;
+					}
+					if (tempval > arrMax)
+					{
+						arrMax = tempval;
+					}
+				}
+			}
+			returnval += (arrMax - arrMin);
+		}
+	}
+	return returnval / (hResolution * vResolution);
+}
+
+signed long limit(signed long input, signed long lower, signed long upper)
+{
+	if (input > upper)
+	{
+		return upper;
+	}
+	if (input < lower)
+	{
+		return lower;
+	}
+	else
+	{
+		return input;
+	}
 }
