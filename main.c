@@ -103,38 +103,128 @@ void main(void)
 		errorflags |= 0x01;
 	}
 
-	if (!(errorflags))	   // check for endianness (necessary to check for tiff flag as it is influenced by endianness too)
-		if (!(errorflags)) // print data compression
+	if (!(errorflags)) // check for endianness (necessary to check for tiff flag as it is influenced by endianness too)
+	{
+		printf("file opened \n");
+		if (getc(fptr) != 0x49)
 		{
-			for (unsigned int i = 0; i < IFD_entries; i++)
+			printf("file is in big endian. this is currently not supported \n");
+			errorflags |= 0x04;
+		}
+	}
+
+	if (errorflags & ~0x0001) // check for tiff/dnf flag
+	{
+		if (freadchar(fptr, 2))
+		{
+			printf("this file does not conform to tiff/dnf \n");
+			errorflags |= 0x02;
+		}
+	}
+
+	if (!(errorflags)) // parse IFD length and allocate memory to mirror
+	{
+		for (unsigned char i = 0; i < 4; i++)
+		{
+			IFD_index_offset |= (freadchar(fptr, (4 + i)) << (i * 8));
+		}
+
+		IFD_entries = freadint(fptr, IFD_index_offset);
+
+		IFD_arr_ptr = (struct IFD_Entry *)malloc(sizeof(struct IFD_Entry) * freadchar(fptr, IFD_index_offset));
+
+		if (IFD_arr_ptr == NULL)
+		{
+			printf("IFD arr memory could not be allocated \n");
+			errorflags |= 0x08;
+		}
+	}
+
+	if (!(errorflags)) // parse IFD and mirror tag datatype and datalocation
+	{
+		for (unsigned int i = 0; i < IFD_entries; i++)
+		{
+			IFD_arr_ptr[i].tag = freadint(fptr, IFD_index_offset + 2 + (12 * i));
+
+			IFD_arr_ptr[i].type = freadint(fptr, IFD_index_offset + 4 + (12 * i));
+
+			IFD_arr_ptr[i].data_arr_len = freadlong(fptr, IFD_index_offset + 6 + (12 * i));
+
+			if (data_unit_len[IFD_arr_ptr[i].type] * IFD_arr_ptr[i].data_arr_len <= 4)
 			{
-				if (IFD_arr_ptr[i].tag == 259) // if tag == compression type
+				IFD_arr_ptr[i].data_offset = IFD_index_offset + 10 + (12 * i);
+			}
+			else
+			{
+				IFD_arr_ptr[i].data_offset = freadlong(fptr, IFD_index_offset + 10 + (12 * i));
+			}
+		}
+	}
+
+#ifdef VERBOSE
+	if (!(errorflags)) // parse and print IFD entries
+	{
+		for (unsigned int i = 0; i < IFD_entries; i++)
+		{
+			printf("IFD entry Nr. %i \n", i);
+			printf("IFD tag %i \n", IFD_arr_ptr[i].tag);
+			printf("array is %li long\n", IFD_arr_ptr[i].data_arr_len);
+			printf("datatype is");
+
+			if (IFD_arr_ptr[i].type == 2 || (IFD_arr_ptr[i].data_arr_len >= 3 && IFD_arr_ptr[i].data_arr_len <= 50)) // check that string is between 3 and 50 chars long (this is to not print possible classification letters or long html stuff)
+			{
+				char string[(IFD_arr_ptr[i].data_arr_len) + 1];
+				for (unsigned int y = 0; y < IFD_arr_ptr[i].data_arr_len; y++)
 				{
-					compression_Type = freadint(fptr, IFD_arr_ptr[i].data_offset);
-					i = 0xfffe; // for exit statement
-					switch (compression_Type)
-					{
-					case backTobackData:
-						printf("encoding type is backtoback data. \nthis file is readable \n");
-						break;
+					string[y] = freadchar(fptr, IFD_arr_ptr[i].data_offset + y);
+				}
+				string[IFD_arr_ptr[i].data_arr_len] = '\0';
+				printf(" string with contents: ");
+				printf("%s", string);
+				printf("\n");
+			}
+			else
+			{
+				printf(" 0x%04x ", IFD_arr_ptr[i].type);
+				printf("at adress 0x%08lx \n", IFD_arr_ptr[i].data_offset);
+			}
 
-					case huffmanRunlength:
-						printf("this file is huffman encoded and tha data is thus not supported");
-						errorflags |= 0x08;
-						break;
+			printf("\n");
+		}
+	}
+#endif
 
-					case bitPacking:
-						printf("the encoding type bitpacking encoding is currently not supported");
-						errorflags |= 0x08;
-						break;
+	if (!(errorflags)) // print data compression
+	{
+		for (unsigned int i = 0; i < IFD_entries; i++)
+		{
+			if (IFD_arr_ptr[i].tag == 259) // if tag == compression type
+			{
+				compression_Type = freadint(fptr, IFD_arr_ptr[i].data_offset);
+				i = 0xfffe; // for exit statement
+				switch (compression_Type)
+				{
+				case backTobackData:
+					printf("encoding type is backtoback data. \nthis file is readable \n");
+					break;
 
-					default:
-						printf("compression type unknown. compression type nr is 0x%04x \n", compression_Type);
-						break;
-					}
+				case huffmanRunlength:
+					printf("this file is huffman encoded and tha data is thus not supported");
+					errorflags |= 0x08;
+					break;
+
+				case bitPacking:
+					printf("the encoding type bitpacking encoding is currently not supported");
+					errorflags |= 0x08;
+					break;
+
+				default:
+					printf("compression type unknown. compression type nr is 0x%04x \n", compression_Type);
+					break;
 				}
 			}
 		}
+	}
 
 	if (!(errorflags)) // parse data strippattern
 	{
@@ -284,7 +374,7 @@ void main(void)
 
 	if (!(errorflags)) // evaluate
 	{
-//		printf("total contrast is %f\n", totalContrast(pixelData[1], 0.1));
+		//		printf("total contrast is %f\n", totalContrast(pixelData[1], 0.1));
 	}
 
 	if (!(errorflags & ~0x01)) // freeing memory
@@ -398,7 +488,7 @@ float totalContrast(float **image, float radius)
 			{
 				for (signed int testarrY = -(frame / 2); testarrY < (frame / 2); testarrY++)
 				{
-					float tempval = image[limit(x+testarrX, 0, hResolution)][limit(y+testarrY, 0, vResolution)];
+					float tempval = image[limit(x + testarrX, 0, hResolution)][limit(y + testarrY, 0, vResolution)];
 					if (tempval < arrMin)
 					{
 						arrMin = tempval;
