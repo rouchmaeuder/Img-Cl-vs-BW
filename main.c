@@ -226,14 +226,14 @@ void main(void)
 	if (!(errorflags)) // parse data strippattern
 	{
 		unsigned int stripCount = 0;
-		unsigned int BitsPerSample = (unsigned int)IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 258);
-		unsigned long hLinesPerStrip = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 278); // tag 278
-		unsigned long StripOffsets = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 273);	  // tag 273
-		unsigned long StripByteCount = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 279); // tag 279
-		SamplesPerPixel = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 277);
-		hResolution = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 256);
-		vResolution = IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 257);
-		unsigned int perRowBytes = (hResolution * SamplesPerPixel * BitsPerSample / 8);
+		unsigned int BitsPerSample 		= (unsigned int)IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 258);
+		unsigned long hLinesPerStrip 	= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 278); // tag 278
+		unsigned long StripOffsets 		= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 273); // tag 273
+		unsigned long StripByteCount 	= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 279); // tag 279
+		SamplesPerPixel 				= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 277);
+		hResolution 					= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 256);
+		vResolution 					= 				IFDReadEntry(fptr, IFD_arr_ptr, IFD_entries, 257);
+		unsigned int perRowBytes 		= (hResolution * SamplesPerPixel * BitsPerSample / 8);
 
 		for (unsigned int i = 0; i < IFD_entries; i++)
 		{
@@ -288,7 +288,6 @@ void main(void)
 				{
 					for (unsigned char sample = 0; sample < SamplesPerPixel; sample++)
 					{
-//						pixelData[sample][x][y] = fillLongInt(fptr, StripOffsets + (perRowBytes * y), ((x) * BitsPerSample * SamplesPerPixel) + (sample * BitsPerSample), BitsPerSample);
 						unsigned int arrptr = (perRowBytes * y) + (((x * BitsPerSample * SamplesPerPixel) + (sample * BitsPerSample)) / 8);
 						unsigned long LeftJustifiedSubpixelLuminocity = temp_imgData[arrptr] << ((((x * SamplesPerPixel * BitsPerSample) + (sample * SamplesPerPixel)) % 8) + 24);
 						for (unsigned int i = 1; i < (BitsPerSample / 8) + 1; i++)
@@ -297,9 +296,6 @@ void main(void)
 						}
 
 						LeftJustifiedSubpixelLuminocity &= (0xffffffff << (32 - BitsPerSample));
-						
-						if (LeftJustifiedSubpixelLuminocity > 0xf0000000) counter++;
-
 						pixelData[sample][x][y] = (float)LeftJustifiedSubpixelLuminocity / (float) 0xffffffff;
 					}
 				}
@@ -308,7 +304,6 @@ void main(void)
 				printStatusBar((unsigned char)(((float)x / (float)hResolution) * 100));
 			}
 			printf("\n");
-			printf("subpixels in ulong format above 0xf0000000 = %li\n", counter);
 			free(temp_imgData);
 		}
 	}
@@ -337,17 +332,10 @@ void main(void)
 				for (unsigned int Sample = 0; Sample < SamplesPerPixel; Sample++)
 				{
 					tempval += powf(pixelData[Sample][x][y], 2);
-					if (pixelData[Sample][x][y] > 0.9)
-					{
-						counter++;
-					}
-					
 				}
 				totalpixelavg += (sqrtf(tempval)) / (hResolution * vResolution);
 			}
 		}
-
-		printf("amount of subpixels above 0.9 = %li ,\n", counter);
 
 		printf("the total average luminocity of the image is %f \n", totalpixelavg);
 
