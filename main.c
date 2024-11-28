@@ -374,7 +374,7 @@ void main(void)
 
 	if (!(errorflags)) // evaluate
 	{
-		printf("total contrast is %f\n", totalContrast(pixelData[1], 0.1));
+		printf("total contrast is %f\n", totalContrast(pixelData[1], 0.01));
 	}
 
 	if (!(errorflags & ~0x01)) // freeing memory
@@ -481,17 +481,18 @@ float totalContrast(float **image, float radius)
 	float returnval = 0;
 	float arrMax = 0;
 	float arrMin = 0;
+	printf("calculating avg contrast: \n");
 	for (unsigned long x = 0; x < hResolution; x++)
 	{
 		for (unsigned long y = 0; y < vResolution; y++)
 		{
 			// loops over every pixel
 
-			for (signed int testarrX = -(frame / 2); testarrX < (frame / 2); testarrX++)
+			for (signed int testarrX = 0; testarrX < frame; testarrX++)
 			{
-				for (signed int testarrY = -(frame / 2); testarrY < (frame / 2); testarrY++)
+				for (signed int testarrY = 0; testarrY < frame; testarrY++)
 				{
-					float tempval = image[limit(x + testarrX, 0, hResolution)][limit(y + testarrY, 0, vResolution)];
+					float tempval = image[limit(x + testarrX - (frame / 2), 0, (hResolution-1))][limit(y + testarrY - (frame / 2), 0, (vResolution-1))];
 					if (tempval < arrMin)
 					{
 						arrMin = tempval;
@@ -501,21 +502,23 @@ float totalContrast(float **image, float radius)
 						arrMax = tempval;
 					}
 				}
-				insidecounter++;
+//				insidecounter++;
+			}
 
-			}
-			if (arrMax < arrMin) 
-			{
-				outsidecounter++;
-				if (outsidecounter == 500)
-				{
-					printf("\narrMax = %f, arrmin = %f\n", arrMax, arrMin);
-				}
-			}
+//			if (arrMax < arrMin) 
+//			{
+//				outsidecounter++;
+//				if (outsidecounter == 500)
+//				{
+//					printf("\narrMax = %f, arrmin = %f\n", arrMax, arrMin);
+//				}
+//			}
 			returnval += (arrMax - arrMin);
 			arrMax = -100;
 			arrMin = 100;
 		}
+		printf("\r");
+		printStatusBar((unsigned char)(((float)x / (float)hResolution) * 100));
 	}
 	printf("asdf%i", frame);
 
