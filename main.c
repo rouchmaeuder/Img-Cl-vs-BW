@@ -67,6 +67,7 @@ unsigned long IFD_index_offset = 0;
 unsigned long hResolution = 0;
 unsigned long vResolution = 0;
 unsigned int SamplesPerPixel = 0;
+float totalpixelavg = 0;
 
 unsigned int errorflags = 0;
 /*
@@ -81,6 +82,7 @@ bit  |error
 FILE *fptr;
 
 float ***pixelData = NULL;
+float **BwPixelData = NULL;
 
 unsigned char freadchar(FILE *file, unsigned long offset);																	   // Reads a unsigned char out of a file at a specified offset within
 unsigned int freadint(FILE *file, unsigned long offset);																	   // Reads a unsigned integer out of a file at a specified offset within
@@ -311,22 +313,14 @@ void main(void)
 		}
 	}
 
-	if (!(errorflags)) // print preview image
+	if (!(errorflags)) // convert to B/W and 
 	{
-		unsigned int PixelsPerPixelY = vResolution / PREVRES;
-		unsigned int PixelsPerPixelX = PixelsPerPixelY / 2;
-		unsigned int previewXRes = hResolution / PixelsPerPixelX;
-		unsigned long divBy = PixelsPerPixelX * PixelsPerPixelY * SamplesPerPixel;
-		float pixelavg = 0;
-		float totalpixelavg = 0;
-		unsigned long counter = 0;
-
-#ifdef VERBOSE
-		printf("a preview pixel is composed of %i x %i\n", PixelsPerPixelX, PixelsPerPixelY);
-		printf("this results in a image wich is %i x %i\n", PREVRES, (unsigned int)previewXRes);
-		printf("thus each subpixels has to be divided by %li to summed together result in equal weights\n", divBy);
-#endif
-
+		BwPixelData = (float**)malloc(sizeof(float*) * hResolution);
+		for (unsigned int i = 0; i < hResolution; i++)
+		{
+			BwPixelData[i] = (float*)malloc(sizeof(float) * vResolution);
+		}
+		
 		for (unsigned int x = 0; x < hResolution; x++)
 		{
 			for (unsigned int y = 0; y < vResolution; y++)
@@ -336,9 +330,26 @@ void main(void)
 				{
 					tempval += powf(pixelData[Sample][x][y], 2);
 				}
-				totalpixelavg += (sqrtf(tempval)) / (hResolution * vResolution);
+				BwPixelData[x][y] = sqrtf(tempval);
+				totalpixelavg += BwPixelData[x][y] / (hResolution * vResolution);
 			}
 		}
+	}
+
+	if (!(errorflags)) // print preview image
+	{
+		unsigned int PixelsPerPixelY = vResolution / PREVRES;
+		unsigned int PixelsPerPixelX = PixelsPerPixelY / 2;
+		unsigned int previewXRes = hResolution / PixelsPerPixelX;
+		unsigned long divBy = PixelsPerPixelX * PixelsPerPixelY * SamplesPerPixel;
+		float pixelavg = 0;
+		unsigned long counter = 0;
+
+#ifdef VERBOSE
+		printf("a preview pixel is composed of %i x %i\n", PixelsPerPixelX, PixelsPerPixelY);
+		printf("this results in a image wich is %i x %i\n", PREVRES, (unsigned int)previewXRes);
+		printf("thus each subpixels has to be divided by %li to summed together result in equal weights\n", divBy);
+#endif
 
 		printf("the total average luminocity of the image is %f \n", totalpixelavg);
 
@@ -374,7 +385,7 @@ void main(void)
 
 	if (!(errorflags)) // evaluate
 	{
-		printf("total contrast is %f\n", totalContrast(pixelData[1], 0.01));
+		printf("total contrast is %f\n", totalContrast(BwPixelData, 0.01));
 	}
 
 	if (!(errorflags & ~0x01)) // freeing memory
@@ -390,6 +401,12 @@ void main(void)
 			free((void *)pixelData[i]);
 		}
 		free((void *)pixelData);
+
+		for (unsigned int i = 0; i < hResolution; i++)
+		{
+			free(BwPixelData[i]);
+		}
+		free(BwPixelData);
 
 		fclose(fptr);
 	}
@@ -487,12 +504,11 @@ float totalContrast(float **image, float radius)
 		for (unsigned long y = 0; y < vResolution; y++)
 		{
 			// loops over every pixel
-
 			for (signed int testarrX = 0; testarrX < frame; testarrX++)
 			{
 				for (signed int testarrY = 0; testarrY < frame; testarrY++)
 				{
-					float tempval = image[limit(x + testarrX - (frame / 2), 0, (hResolution-1))][limit(y + testarrY - (frame / 2), 0, (vResolution-1))];
+					float tempval = image[limit(x + testarrX - (frame / 2), 0, (hResolution - 1))][limit(y + testarrY - (frame / 2), 0, (vResolution - 1))];
 					if (tempval < arrMin)
 					{
 						arrMin = tempval;
@@ -502,17 +518,7 @@ float totalContrast(float **image, float radius)
 						arrMax = tempval;
 					}
 				}
-//				insidecounter++;
 			}
-
-//			if (arrMax < arrMin) 
-//			{
-//				outsidecounter++;
-//				if (outsidecounter == 500)
-//				{
-//					printf("\narrMax = %f, arrmin = %f\n", arrMax, arrMin);
-//				}
-//			}
 			returnval += (arrMax - arrMin);
 			arrMax = -100;
 			arrMin = 100;
@@ -520,12 +526,6 @@ float totalContrast(float **image, float radius)
 		printf("\r");
 		printStatusBar((unsigned char)(((float)x / (float)hResolution) * 100));
 	}
-	printf("asdf%i", frame);
-
-	printf("for should loop from %i to %i", (-1 * (signed int)(frame / 2)), (frame / 2));
-
-	printf("\n\nbrooo %li\n\n", insidecounter);
-	printf("\n\nbrooo %li\n\n", outsidecounter);
 	return returnval / (hResolution * vResolution);
 }
 
