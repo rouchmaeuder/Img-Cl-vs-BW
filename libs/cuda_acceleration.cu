@@ -3,9 +3,12 @@
 #include "math.h"
 #include "cuda_acceleration.h"
 
-// compile with idfknow nvcc odr so
+// compile with  /usr/local/cuda/bin/nvcc /home/user/tiff_file_parser/libs/cuda_acceleration.cu -o /home/user/tiff_file_parser/cuda_acceleration.o -c
 
-void printStatusBar(unsigned char input)
+__device__ static inline signed long limit(signed long input, signed long lower, signed long upper);
+__global__ void ParalellTotalContrastParallelismFunction (float **InputData, float **outputData, unsigned int frame, unsigned long index, unsigned int hResolution, unsigned int vResolution);
+float cppParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution);
+/*void printStatusBar(unsigned char input)
 {
 	printf("[");
 	for (unsigned int i = 0; i < 50; i++)
@@ -20,9 +23,16 @@ void printStatusBar(unsigned char input)
 		}
 	}
 	printf("]");
+}*/
+
+extern "C"{
+float ParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution)
+{
+	return cppParalellTotalContrast(image, radius, vResolution, hResolution);
+}
 }
 
-float ParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution)
+float cppParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution)
 {
 	unsigned int frame = radius * hResolution;
 	float returnval = 0;
@@ -34,7 +44,7 @@ float ParalellTotalContrast(float **image, float radius, unsigned int vResolutio
 	float ** output;
 
 
-	cudaMallocManaged((void **) &cu_image, sizeof(float*) * hResolution); //setup 1st dimention input array
+	cudaMallocManaged(&cu_image, sizeof(float*) * hResolution); //setup 1st dimention input array
 
 	for(unsigned int i = 0; i < hResolution; i++) // allocate second dimention storage
 	{
@@ -73,8 +83,8 @@ float ParalellTotalContrast(float **image, float radius, unsigned int vResolutio
 			ParalellTotalContrastParallelismFunction <<<(512),(1)>>> (cu_image, output, (radius * hResolution), index, hResolution, vResolution);
 			index += 512;
 		}
-		printf("\r");
-		printStatusBar((unsigned char)(((float)index / (float)(hResolution * vResolution)) * 100));
+//		printf("\r");
+//		printStatusBar((unsigned char)(((float)index / (float)(hResolution * vResolution)) * 100));
 		cudaDeviceSynchronize();
 	}
 

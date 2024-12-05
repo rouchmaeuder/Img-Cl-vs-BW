@@ -1,8 +1,11 @@
 #include "stdlib.h"
 #include "stdio.h"
 #include "math.h"
+#include "libs/cuda_acceleration.h"
 
-// compile with idfknow nvcc odr so
+// compile with gcc main.c -lm -o main.o 
+// link with 	gcc main.o libs/cuda_acceleration.o -lcudart -L/usr/local/cuda/lib64 -lm -o a.out
+// total command /usr/local/cuda/bin/nvcc /home/user/tiff_file_parser/libs/cuda_acceleration.cu -Xcompiler "-fPIC" -o /home/user/tiff_file_parser/libs/cuda_acceleration.o -c && gcc main.c -lm -o main.o -c && gcc main.o libs/cuda_acceleration.o -lcudart -L/usr/local/cuda/lib64 -lm -lstdc++ -v -o a.out
 
 #define BYTE_TYPE 1
 #define ASCII_TYPE 2
@@ -92,16 +95,13 @@ unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry);															
 unsigned long IFDReadEntry(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, unsigned int IFD_Entry_count, unsigned int tag); // Reads up to a unsigned long out of an IFD with a specified tag out of an array of IFD_entry types
 unsigned long fillLongInt(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen);				   // deprecated method to uncompress back to back data compression
 void printStatusBar(unsigned char input);																					   // takes a unsigned char from 0 to 100 as a percentage
-__device__ static inline signed long limit(signed long input, signed long lower, signed long upper);
+static inline signed long limit(signed long input, signed long lower, signed long upper);
 
 float totalContrast(float **image, float radius); // calculate contrast
-__global__ void ParalellTotalContrastParallelismFunction (float **InputData, float **outputData, unsigned int frame, unsigned long index, unsigned int hResolution, unsigned int vResolution); // supposed to be run in threads
-float ParalellTotalContrast(float **image, float radius);
-
 
 int main(void)
 {
-	fptr = fopen("/home/user/tiff_file_parser/pic.tif", "r");
+	fptr = fopen("/home/user/tiff_file_parser/data/pic.tif", "r");
 
 	if (fptr == NULL) // check for file opening errors
 	{
@@ -387,7 +387,7 @@ int main(void)
 	if (!(errorflags)) // evaluate
 	{
 		printf("text");
-		printf("total contrast is %f\n", ParalellTotalContrast(BwPixelData, 0.01));
+		printf("total contrast is %f\n", ParalellTotalContrast(BwPixelData, 0.01, vResolution, hResolution));
 	}
 
 	if (!(errorflags & ~0x01)) // freeing memory
@@ -493,7 +493,7 @@ void printStatusBar(unsigned char input)
 	printf("]");
 }
 
-/*float totalContrast(float **image, float radius)
+float totalContrast(float **image, float radius)
 {
 	unsigned int frame = radius * hResolution;
 	float returnval = 0;
@@ -528,115 +528,9 @@ void printStatusBar(unsigned char input)
 		printStatusBar((unsigned char)(((float)x / (float)hResolution) * 100));
 	}
 	return returnval / (hResolution * vResolution);
-}*/
-
-float ParalellTotalContrast(float **image, float radius)
-{
-	unsigned int frame = radius * hResolution;
-	float returnval = 0;
-	printf("calculating avg contrast: \n");
-
-	unsigned long index = 0;
-
-	float ** cu_image;
-	float ** output;
-
-
-	cudaMallocManaged((void **) &cu_image, sizeof(float*) * hResolution); //setup 1st dimention input array
-
-	for(unsigned int i = 0; i < hResolution; i++) // allocate second dimention storage
-	{
-		cudaMallocManaged(((float*)cu_image)[i], sizeof(float) * vResolution);
-	}
-
-	printf("cuda image array allocated");
-
-	for (unsigned int x = 0; x < hResolution; x++)
-	{
-		for (unsigned int y = 0; y < vResolution; y++)
-		{
-			cu_image[x][y] = image[x][y];
-		}
-		
-	}
-	
-
-	cudaMalloc((void **) &output, sizeof(float*) * hResolution); //setup 1st dimention array
-
-	float* OutputSecondDimentionPointers[hResolution]; // temporary storage array to store device pointers to second image dimention
-	for(unsigned int i = 0; i < hResolution; i++) // allocate second dimention storage
-	{
-		cudaMallocManaged(output[i], sizeof(float) * vResolution);
-	}
-	printf("cuda outputarr allocated");
-
-	while(index < (vResolution * hResolution))
-	{
-		if(((vResolution * hResolution) - index) < 512)
-		{
-			ParalellTotalContrastParallelismFunction <<<(((vResolution * hResolution) - index)),(1)>>> (cu_image, output, (radius * hResolution), index, hResolution, vResolution);
-			index += ((vResolution * hResolution) - index);
-		}
-		else
-		{
-			ParalellTotalContrastParallelismFunction <<<(512),(1)>>> (cu_image, output, (radius * hResolution), index, hResolution, vResolution);
-			index += 512;
-		}
-		printf("\r");
-		printStatusBar((unsigned char)(((float)index / (float)(hResolution * vResolution)) * 100));
-		cudaDeviceSynchronize();
-	}
-
-	for (unsigned long x = 0; x < hResolution; x++)
-	{
-		for (unsigned long y = 0; y < vResolution; y++)
-		{
-			returnval += output[x][y];
-		}
-	}
-
-	for (unsigned int i = 0; i < hResolution; i++)
-	{
-		cudaFree(output[i]);
-	}
-	cudaFree(output);
-
-	for (unsigned int i = 0; i < hResolution; i++)
-	{
-		cudaFree(cu_image[i]);
-	}
-	cudaFree(cu_image);
-
-	return returnval / (hResolution * vResolution);
 }
 
-__global__ void ParalellTotalContrastParallelismFunction (float **InputData, float **outputData, unsigned int frame, unsigned long index, unsigned int hResolution, unsigned int vResolution) // supposed to be run in threads
-{
-	float arrMax = -100;
-	float arrMin = 100;
-
-	unsigned int x = (index + threadIdx.x) % hResolution;
-	unsigned int y = (index + threadIdx.x) / hResolution;
-
-	for (signed int testarrX = 0; testarrX < frame; testarrX++)
-	{
-		for (signed int testarrY = 0; testarrY < frame; testarrY++)
-		{
-			float tempval = InputData[limit(x + testarrX - (frame / 2), 0, (hResolution - 1))][limit(y + testarrY - (frame / 2), 0, (vResolution - 1))];
-			if (tempval < arrMin)
-			{
-				arrMin = tempval;
-			}
-			if (tempval > arrMax)
-			{
-				arrMax = tempval;
-			}
-		}
-	}
-	outputData[x][y] = arrMax - arrMin;
-}
-
-__device__ static inline signed long limit(signed long input, signed long lower, signed long upper)
+static inline signed long limit(signed long input, signed long lower, signed long upper)
 {
 	if (input > upper)
 	{
@@ -651,12 +545,3 @@ __device__ static inline signed long limit(signed long input, signed long lower,
 		return input;
 	}
 }
-
-/*static inline void malloc2D()
-{
-	BwPixelData = (float**)malloc(sizeof(float*) * hResolution);
-	for (unsigned int i = 0; i < hResolution; i++)
-	{
-		BwPixelData[i] = (float*)malloc(sizeof(float) * vResolution);
-	}
-}*/
