@@ -2,6 +2,7 @@
 #include "stdio.h"
 #include "math.h"
 #include "libs/cuda_acceleration.h"
+#include "time.h"
 
 // compile with gcc main.c -lm -o main.o 
 // link with 	gcc main.o libs/cuda_acceleration.o -lcudart -L/usr/local/cuda/lib64 -lm -o a.out
@@ -386,8 +387,17 @@ int main(void)
 
 	if (!(errorflags)) // evaluate
 	{
-		printf("text");
+		printf("evaluating with graphicscard\n");
+		time_t seconds = time(NULL);
 		printf("total contrast is %f\n", ParalellTotalContrast(BwPixelData, 0.01, vResolution, hResolution));
+		time_t seconds_ref = time(NULL);
+		printf("took %li seconds\n", seconds_ref - seconds);
+
+		printf("evaluating with cpu\n");
+		seconds = time(NULL);
+		printf("total contrast is %f\n", totalContrast(BwPixelData, 0.01));
+		seconds_ref = time(NULL);
+		printf("took %li seconds\n", seconds_ref - seconds);
 	}
 
 	if (!(errorflags & ~0x01)) // freeing memory
@@ -491,6 +501,7 @@ void printStatusBar(unsigned char input)
 		}
 	}
 	printf("]");
+	fflush(stdout);
 }
 
 float totalContrast(float **image, float radius)
