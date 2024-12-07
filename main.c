@@ -393,11 +393,11 @@ int main(void)
 		time_t seconds_ref = time(NULL);
 		printf("took %li seconds\n", seconds_ref - seconds);
 
-		printf("evaluating with cpu\n");
+//		printf("evaluating with cpu\n");
 		seconds = time(NULL);
-		printf("total contrast is %f\n", totalContrast(BwPixelData, 0.01));
+//		printf("total contrast is %f\n", totalContrast(BwPixelData, 0.01));
 		seconds_ref = time(NULL);
-		printf("took %li seconds\n", seconds_ref - seconds);
+//		printf("took %li seconds\n", seconds_ref - seconds);
 	}
 
 	if (!(errorflags & ~0x01)) // freeing memory
