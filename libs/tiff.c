@@ -37,8 +37,8 @@ static void printStatusBar(unsigned char input);
 
 enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char filePath [])
 {
-    enum errorType errorflags;
-    unsigned int IFD_index_offset;
+    enum errorType errorflags = 0;
+    unsigned int IFD_index_offset = 0;
 
 	imgObj->OriginFilePointer = fopen(filePath, "r");
 
@@ -125,6 +125,7 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 	{
 		for (unsigned int i = 0; i < imgObj->IFD.Entries; i++)
 		{
+			
 			printf("IFD entry Nr. %i \n", i);
 			printf("IFD tag %i \n", imgObj->IFD.IFDs[i].tag);
 			printf("array is %li long\n", imgObj->IFD.IFDs[i].data_arr_len);
@@ -138,12 +139,15 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 					string[y] = freadchar(imgObj->OriginFilePointer, imgObj->IFD.IFDs[i].data_offset + y);
 				}
 				string[imgObj->IFD.IFDs[i].data_arr_len] = '\0';
+				
 				printf(" string with contents: ");
 				printf("%s", string);
 				printf("\n");
+				
 			}
 			else
 			{
+				
 				printf(" 0x%04x ", imgObj->IFD.IFDs[i].type);
 				printf("at adress 0x%08lx \n", imgObj->IFD.IFDs[i].data_offset);
 			}
@@ -393,6 +397,20 @@ void printPreview(struct tiff* imgObj, unsigned char prevYres)
 			pixelavg = 0;
 		}
 		printf("\n");
+	}
+}
+
+char* errConvertToString(enum errorType error)
+{
+	switch (error)
+	{
+	case Success: return "Success";
+	case FileAccessError: return "File is not accessible";
+	case FileIsNotTiffError: return "File Is not a TIFF";
+	case FileIsBigEndianError: return "File is Big Endian";
+    case UnsupportedEncodingError: return "File encoding is unsupported";
+    case MultiStripImageError: return "Image Data is split into multiple Strips";
+	default: return "unknown error";
 	}
 }
 

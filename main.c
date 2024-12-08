@@ -1,5 +1,6 @@
 #include "libs/cuda_acceleration.h"
 #include "time.h"
+#include "dirent.h"
 #include "libs/tiff.h"
 
 // compile with gcc main.c -lm -o main.o 
@@ -14,25 +15,36 @@ static inline signed long limit(signed long input, signed long lower, signed lon
 
 float totalContrast(float **image, float radius); // calculate contrast
 
-int main(void)
+int main(int argc, char * argv[])
 {
-	VerboseFlag = 0;
-	struct tiff img;
-	if (openTiff(&img, 1, "/home/user/tiff_file_parser/data/pic.tif") != Success)
+	VerboseFlag = PrintNone;
+/*	DIR * imgDir = opendir(argv[1]);
+
+	if (imgDir == NULL)
 	{
-		printf("error\n");
+		printf("was not able to open directory");
+		return 0;
+	}*/
+	
+
+	struct tiff img;
+	enum errorType dbgError = openTiff(&img, 1, "/home/user/tiff_file_parser/data/pic.tif");
+	if (dbgError != Success)
+	{
+		printf("error%s\n", errConvertToString(dbgError));
 		return 1;
 	}
 
 	printf("evaluating with graphicscard\n");
 	time_t seconds = time(NULL);
-	printf("total contrast is %f\n", ParalellTotalContrast(img.BW_Data, 0.01, img.vResolution, img.hResolution));
+//	printf("total contrast is %f\n", ParalellTotalContrast(img.BW_Data, 0.01, img.vResolution, img.hResolution));
 	time_t seconds_ref = time(NULL);
 	printf("took %li seconds\n", seconds_ref - seconds);
 
 	printPreview(&img, 32);
 
 	closeTiff(&img);
+//	closedir(imgDir);
 	return 0;
 }
 
@@ -54,43 +66,6 @@ void printStatusBar(unsigned char input)
 	printf("]");
 	fflush(stdout);
 }
-
-/*float totalContrast(float **image, float radius)
-{
-	unsigned int frame = radius * hResolution;
-	float returnval = 0;
-	float arrMax = 0;
-	float arrMin = 0;
-	printf("calculating avg contrast: \n");
-	for (unsigned long x = 0; x < hResolution; x++)
-	{
-		for (unsigned long y = 0; y < vResolution; y++)
-		{
-			// loops over every pixel
-			for (signed int testarrX = 0; testarrX < frame; testarrX++)
-			{
-				for (signed int testarrY = 0; testarrY < frame; testarrY++)
-				{
-					float tempval = image[limit(x + testarrX - (frame / 2), 0, (hResolution - 1))][limit(y + testarrY - (frame / 2), 0, (vResolution - 1))];
-					if (tempval < arrMin)
-					{
-						arrMin = tempval;
-					}
-					if (tempval > arrMax)
-					{
-						arrMax = tempval;
-					}
-				}
-			}
-			returnval += (arrMax - arrMin);
-			arrMax = -100;
-			arrMin = 100;
-		}
-		printf("\r");
-		printStatusBar((unsigned char)(((float)x / (float)hResolution) * 100));
-	}
-	return returnval / (hResolution * vResolution);
-}*/
 
 static inline signed long limit(signed long input, signed long lower, signed long upper)
 {
