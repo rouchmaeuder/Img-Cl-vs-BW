@@ -34,6 +34,7 @@ bit  |error
 0x08 |unsupported encoding type
 0x10 |above 1 img strip
 */
+char* errConvertToString(enum errorType error);
 
 enum verbosityLevel{
     PrintNone = 0x00,
