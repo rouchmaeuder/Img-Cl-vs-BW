@@ -1,9 +1,10 @@
 #include "stdlib.h"
 #include "stdio.h"
 #include "math.h"
+#include "tiff.h"
 #include "cuda_acceleration.h"
 
-#define BLOCKS		((hResolution * vResolution)/1024)
+#define BLOCKS		/*((hResolution * vResolution)/1024)*/ 7
 #define THREADS		1024
 
 // compile with  /usr/local/cuda/bin/nvcc /home/user/tiff_file_parser/libs/cuda_acceleration.cu -o /home/user/tiff_file_parser/cuda_acceleration.o -c
@@ -12,23 +13,7 @@ __device__ static inline signed long limit(signed long input, signed long lower,
 __global__ void ParalellTotalContrastParallelismFunction (float **InputData, float **outputData, unsigned int frame, unsigned long index, unsigned int hResolution, unsigned int vResolution);
 float cppParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution);
 __host__ signed long limith(signed long input, signed long lower, signed long upper);
-void printStatusBar(unsigned char input)
-{
-	printf("[");
-	for (unsigned int i = 0; i < 50; i++)
-	{
-		if (i > input / 2)
-		{
-			printf(" ");
-		}
-		else
-		{
-			printf("#");
-		}
-	}
-	printf("]");
-	fflush(stdout);
-}
+void printStatusBar(unsigned char input);
 
 extern "C"{
 float ParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution)
@@ -48,15 +33,26 @@ float cppParalellTotalContrast(float **image, float radius, unsigned int vResolu
 	float ** output;
 	unsigned long index = 0;
 
-	printf("calculating avg contrast: \n");
-	printf("trying to allocate %i vars of type float* with sizeof %li resulting in %li bytes allocated \n", hResolution, sizeof(float*), sizeof(float*) * hResolution);
+	if(VerboseFlag & DEBUGINFOS)
+	{
+		printf("calculating avg contrast: \n");
+		printf("trying to allocate %i vars of type float* with sizeof %li resulting in %li bytes allocated \n", hResolution, sizeof(float*), sizeof(float*) * hResolution);
+	}
 
 	if(cudaSuccess != cudaMalloc(&cu_image, sizeof(float*) * hResolution)) //setup 1st dimention input array
 	{
-		printf("allocation Error\n");
+		if(VerboseFlag & ERRORS)
+		{
+			printf("allocation Error\n");
+		}
 		return 0;
 	}
-	printf("malloced first\n");
+
+	if(VerboseFlag & DEBUGINFOS)
+	{
+		printf("malloced first\n");
+	}
+	
 
 	for(unsigned int i = 0; i < hResolution; i++) // allocate second dimention storage
 	{
@@ -64,7 +60,10 @@ float cppParalellTotalContrast(float **image, float radius, unsigned int vResolu
 	}
 	cudaMemcpy(cu_image, cu_imageFirstDim, hResolution * sizeof(float*), cudaMemcpyHostToDevice);
 
-	printf("cuda image array allocated\n");
+	if(VerboseFlag & DEBUGINFOS)
+	{
+		printf("cuda image array allocated\n");
+	}
 
 	for (unsigned int x = 0; x < hResolution; x++)
 	{
@@ -104,14 +103,20 @@ float cppParalellTotalContrast(float **image, float radius, unsigned int vResolu
 		cudaDeviceSynchronize();
 	}
 
-	printf("\n exited whileloop\n");
+	if(VerboseFlag & DEBUGINFOS)
+	{
+		printf("\n exited whileloop\n");
+	}
 
 	for (unsigned int i = 0; i < hResolution; i++)
 	{
 		cudaMemcpy(output[i], cu_outputFirstDim[i], (sizeof(float) * vResolution), cudaMemcpyDeviceToHost);
 	}
 
-	printf("copied output to host successfully\n");
+	if(VerboseFlag & DEBUGINFOS)
+	{
+		printf("copied output to host successfully\n");
+	}
 
 	for (unsigned long x = 0; x < hResolution; x++)
 	{
@@ -121,7 +126,11 @@ float cppParalellTotalContrast(float **image, float radius, unsigned int vResolu
 		}
 	}
 
-	printf("calculated total delta\n");
+	if(VerboseFlag & DEBUGINFOS)
+	{
+		printf("calculated total delta\n");
+	}
+
 
 	for (unsigned int i = 0; i < hResolution; i++)
 	{
@@ -201,4 +210,22 @@ __host__ signed long limith(signed long input, signed long lower, signed long up
 	{
 		return input;
 	}
+}
+
+void printStatusBar(unsigned char input)
+{
+	printf("[");
+	for (unsigned int i = 0; i < 50; i++)
+	{
+		if (i > input / 2)
+		{
+			printf(" ");
+		}
+		else
+		{
+			printf("#");
+		}
+	}
+	printf("]");
+	fflush(stdout);
 }
