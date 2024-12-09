@@ -7,6 +7,9 @@
 #define BLOCKS		/*((hResolution * vResolution)/1024)*/ 7
 #define THREADS		1024
 
+#define FILTERQUALITY 40
+#define CUTOFF 0.8
+
 // compile with  /usr/local/cuda/bin/nvcc /home/user/tiff_file_parser/libs/cuda_acceleration.cu -o /home/user/tiff_file_parser/cuda_acceleration.o -c
 
 __device__ static inline signed long limit(signed long input, signed long lower, signed long upper);
@@ -14,6 +17,7 @@ __global__ void ParalellTotalContrastParallelismFunction (float **InputData, flo
 float cppParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution);
 __host__ signed long limith(signed long input, signed long lower, signed long upper);
 void printStatusBar(unsigned char input);
+__device__ static inline float modSigmoid(float input);
 
 extern "C"{
 float ParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution)
@@ -176,7 +180,7 @@ __global__ void ParalellTotalContrastParallelismFunction (float **InputData, flo
 			}
 		}
 	}
-	outputData[x][y] = arrMax - arrMin;
+	outputData[x][y] = modSigmoid(arrMax - arrMin);
 }
 
 __device__ static inline signed long limit(signed long input, signed long lower, signed long upper)
@@ -228,4 +232,9 @@ void printStatusBar(unsigned char input)
 	}
 	printf("]");
 	fflush(stdout);
+}
+
+__device__ static inline float modSigmoid(float input)
+{
+	return 1/(1 + exp(-((input - CUTOFF) * FILTERQUALITY)));
 }

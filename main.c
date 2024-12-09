@@ -74,7 +74,7 @@ int main(int argc, char * argv[])
 	for (unsigned char i = 0; i < filenum; i++) // loop over all filepaths
 	{
 		openTiff(&img, 1, filePathArr[i]); // open the image
-		float contrastVal = ParalellTotalContrast(img.BW_Data, 0.01, img.vResolution, img.hResolution); // analyze the image
+		float contrastVal = ParalellTotalContrast(img.BW_Data, 0.001, img.vResolution, img.hResolution); // analyze the image
 		closeTiff(&img); // close the image
 
 		printf("total contrast is %f\n", contrastVal); // print the resolution to console
