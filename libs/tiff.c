@@ -7,6 +7,7 @@
 #define STATS 0x02
 #define STATUSBAR 0x04
 #define DEBUGINFOS 0x80
+#define SQRTFTWO 1.4142135624
 
 const unsigned char data_unit_len[6] = {
 	0,
@@ -306,7 +307,7 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 				{
 					tempval += powf(imgObj->RGB_Data[Sample][x][y], 2);
 				}
-				imgObj->BW_Data[x][y] = sqrtf(tempval);
+				imgObj->BW_Data[x][y] = (sqrtf(tempval))/SQRTFTWO;
 				totalpixelavg += imgObj->BW_Data[x][y] / (imgObj->hResolution * imgObj->vResolution);
 			}
 		}
