@@ -1,22 +1,141 @@
 #include "neuro.h"
 #include "stdlib.h"
 #define SIGMOID
+#define PREDEFFUNCCOUNT 3
 
-struct layer
-{
-    float **weightsNBiases;
-    unsigned char neurons;
-};
+static unsigned char freadchar(FILE *file, unsigned long offset);
+static unsigned int freadint(FILE *file, unsigned long offset);
+static unsigned long freadlong(FILE *file, unsigned long offset);
 
-struct layer* initNeuronalNetwork (unsigned char layers, unsigned char neuronsPerLayer[])
+
+error initInputLayer(struct inputLayer * layer, unsigned int size);
+error initHiddenLayer(struct hiddenLayer * layer_n1, void * layer_n0, unsigned int neurons, enum layerType layer_N0_type);
+error initNeuronalNetwork(struct neuronalNetwork * Network, unsigned int perLayerNeurons [], unsigned int layers);
+void freeInputLayer(struct inputLayer * layer);
+void freeHiddenLayer(struct hiddenLayer * layer);
+void freeNeuronalNetwork(struct neuronalNetwork * Network);
+error initNeuronalNetworFromFile(struct neuronalNetwork * networkPtr)
 {
-    struct layer* layerptr = (struct layer*)malloc(sizeof(struct layer) * layers);
-    for (unsigned char i = 0; i < layers; i++)
+    __uint32_t index = 0;
+    networkPtr->hiddenLayerCount = freadlong(networkPtr->NNWBFile, index * 4);
+    index++;
+    networkPtr->inputLayer.nodes = freadlong(networkPtr->NNWBFile, index * 4);
+    index++;
+    networkPtr->hiddenLayers = malloc(sizeof(struct hiddenLayer) * networkPtr->hiddenLayerCount);
+    for (__uint16_t i = 0; i < networkPtr->hiddenLayerCount; i++)
     {
-        layerptr[i].weightsNBiases = malloc(neuronsPerLayer[i] * sizeof(float*));
+        networkPtr->hiddenLayers[i].nodes = freadlong(networkPtr->NNWBFile, index * 4);
+        index++;
+        networkPtr->hiddenLayers[i].weights = malloc(sizeof(float*) * networkPtr->hiddenLayers[i].nodes);
+        for (__uint16_t NodeN1 = 0; NodeN1 < networkPtr->hiddenLayers[i].nodes; NodeN1++) // initializing weights
+        {
+            __uint16_t prevLayerNodes;
+            if (i)
+            {
+                prevLayerNodes = networkPtr->hiddenLayers->nodes;
+            }
+            else
+            {
+                prevLayerNodes = networkPtr->inputLayer.nodes;
+            }
+
+            networkPtr->hiddenLayers[i].weights[NodeN1] = malloc(sizeof(float) * prevLayerNodes);
+            for (__uint16_t NodeN0 = 0; NodeN0 < prevLayerNodes; NodeN0++)
+            {
+                __uint32_t conversionValue = freadlong(networkPtr->NNWBFile, index * 4);
+                index++;
+                networkPtr->hiddenLayers[i].weights[NodeN1][NodeN0] = *((float*)(&conversionValue));
+            }
+        }
+
+        networkPtr->hiddenLayers[i].biases = malloc(sizeof(float) * networkPtr->hiddenLayers[i].nodes);
+        for (__uint16_t NodeN1 = 0; NodeN1 < networkPtr->hiddenLayers[i].nodes; NodeN1++) // initializing biasies
+        {
+            __uint32_t conversionValue = freadlong(networkPtr->NNWBFile, index * 4);
+            index++;
+            networkPtr->hiddenLayers[i].biases[NodeN1] = *((float*)(&conversionValue));
+        }
+        __uint32_t tempFuncIdentifier = freadlong(networkPtr->NNWBFile, index * 4);
+        index++;
+        if (tempFuncIdentifier >= PREDEFFUNCCOUNT)
+        {
+            networkPtr->hiddenLayers[i].delinfunc = delinFuncLut[tempFuncIdentifier];
+        }
+        else
+        {
+            networkPtr->hiddenLayers[i].delinfunc = NULL;
+        }
     }
     
+    return 0;
 }
+error saveNeuronalNetworToFile(struct neuronalNetwork * networkPtr) // DANGER!! overwrites the NNWB file!
+{
+    __uint32_t index = 0;
+    char * filepath;
+    __uint32_t filesize = 0;
+    fgetpos(networkPtr->NNWBFile, filepath);
+    fclose(networkPtr->NNWBFile);
+    fopen(filepath, "wb");
+
+    filesize += 2;
+    __uint32_t * binStream = malloc(2 * sizeof(__uint32_t));
+
+    binStream[index] = networkPtr->hiddenLayerCount;
+    index++;
+    binStream[index] = networkPtr->inputLayer.nodes;
+    index++;
+  //  networkPtr->hiddenLayers = malloc(sizeof(struct hiddenLayer) * networkPtr->hiddenLayerCount);
+
+    filesize += 
+    for (__uint16_t i = 0; i < networkPtr->hiddenLayerCount; i++)
+    {
+        networkPtr->hiddenLayers[i].nodes = freadlong(networkPtr->NNWBFile, index * 4);
+        index++;
+        networkPtr->hiddenLayers[i].weights = malloc(sizeof(float*) * networkPtr->hiddenLayers[i].nodes);
+        for (__uint16_t NodeN1 = 0; NodeN1 < networkPtr->hiddenLayers[i].nodes; NodeN1++) // initializing weights
+        {
+            __uint16_t prevLayerNodes;
+            if (i)
+            {
+                prevLayerNodes = networkPtr->hiddenLayers->nodes;
+            }
+            else
+            {
+                prevLayerNodes = networkPtr->inputLayer.nodes;
+            }
+
+            networkPtr->hiddenLayers[i].weights[NodeN1] = malloc(sizeof(float) * prevLayerNodes);
+            for (__uint16_t NodeN0 = 0; NodeN0 < prevLayerNodes; NodeN0++)
+            {
+                __uint32_t conversionValue = freadlong(networkPtr->NNWBFile, index * 4);
+                index++;
+                networkPtr->hiddenLayers[i].weights[NodeN1][NodeN0] = *((float*)(&conversionValue));
+            }
+        }
+
+        networkPtr->hiddenLayers[i].biases = malloc(sizeof(float) * networkPtr->hiddenLayers[i].nodes);
+        for (__uint16_t NodeN1 = 0; NodeN1 < networkPtr->hiddenLayers[i].nodes; NodeN1++) // initializing biasies
+        {
+            __uint32_t conversionValue = freadlong(networkPtr->NNWBFile, index * 4);
+            index++;
+            networkPtr->hiddenLayers[i].biases[NodeN1] = *((float*)(&conversionValue));
+        }
+        __uint32_t tempFuncIdentifier = freadlong(networkPtr->NNWBFile, index * 4);
+        index++;
+        if (tempFuncIdentifier >= PREDEFFUNCCOUNT)
+        {
+            networkPtr->hiddenLayers[i].delinfunc = delinFuncLut[tempFuncIdentifier];
+        }
+        else
+        {
+            networkPtr->hiddenLayers[i].delinfunc = NULL;
+        }
+    }
+    
+    return 0;
+}
+
 
 // old funcs
 
@@ -31,7 +150,7 @@ void calcArr(float inputarr[NODES], float weightings[LAYERS][NODES][(NODES + 1)]
     }
 }
 
-void calcArr(float inputarr[NODES], float NeuronActivations[LAYERS + 1][NODES], float weightings[LAYERS][NODES][(NODES + 1)])
+void calcArrSaveActivations(float inputarr[NODES], float NeuronActivations[LAYERS + 1][NODES], float weightings[LAYERS][NODES][(NODES + 1)])
 {
     for (unsigned char i = 0; i < LAYERS; i++) // clearing the neuron activations arr and inserting inputvalues
     {
@@ -229,3 +348,23 @@ void setWeightsNBiasarrToZero(float weightsNBiases[LAYERS][NODES][NODES + 1])
     }
 }
 
+// file funcs
+
+static unsigned char freadchar(FILE *file, unsigned long offset)
+{
+	fseek(file, offset, SEEK_SET);
+	return getc(file);
+}
+
+static unsigned int freadint(FILE *file, unsigned long offset)
+{
+	return (unsigned int)freadchar(file, offset) | ((unsigned int)freadchar(file, offset + 1) << 8);
+}
+
+static unsigned long freadlong(FILE *file, unsigned long offset)
+{
+	return (((unsigned long)freadchar(file, offset)) |
+			((unsigned int)freadchar(file, offset + 1) << 8) |
+			((unsigned int)freadchar(file, offset + 2) << 16) |
+			((unsigned int)freadchar(file, offset + 3) << 24));
+}
