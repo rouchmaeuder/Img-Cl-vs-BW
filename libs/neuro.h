@@ -25,6 +25,13 @@
 
 
 // new funcs
+
+float (*const delinFuncLut)(float) = {
+    sigmoid,
+    ReLu,
+    mReLu
+};
+
 enum errorType /*: unsigned int*/
 {
     Success = 0x00,
@@ -32,7 +39,8 @@ enum errorType /*: unsigned int*/
     FileIsNotTiffError = 0x02,
     FileIsBigEndianError = 0x04,
     UnsupportedEncodingError = 0x08,
-    MultiStripImageError = 0x10
+    MultiStripImageError = 0x10,
+    NotAbleToAllocateMem = 0x20
 };
 
 enum layerType
@@ -53,6 +61,7 @@ struct hiddenLayer
     unsigned int nodes;
     float ** weights;
     float * biases;
+    float * activations;
     float (*delinfunc) (float);
 };
 
@@ -61,7 +70,7 @@ struct neuronalNetwork
     struct inputLayer inputLayer;
     struct hiddenLayer * hiddenLayers;
     unsigned int hiddenLayerCount;
-    FILE * NNWBFile;
+    char * NNWBFilePath;
 };
 
 typedef enum errorType error;
@@ -74,6 +83,8 @@ void freeHiddenLayer(struct hiddenLayer * layer);
 void freeNeuronalNetwork(struct neuronalNetwork * Network);
 error initNeuronalNetworFromFile(struct neuronalNetwork * networkPtr);
 error saveNeuronalNetworToFile(struct neuronalNetwork * networkPtr);
+float ReLu (float input);
+float mReLu (float input);
 
 
 // until here
