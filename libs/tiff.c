@@ -232,6 +232,7 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 		}
 		else
 		{
+			// allocate 3d array
 			imgObj->RGB_Data = (float ***)malloc(sizeof(unsigned long **) * imgObj->SamplesPerPixel);
 			for (unsigned int i = 0; i < imgObj->SamplesPerPixel; i++)
 			{
@@ -241,7 +242,6 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 					imgObj->RGB_Data[i][j] = (float *)malloc(sizeof(unsigned long) * imgObj->vResolution);
 				}
 			}
-
             if(VerboseFlag & DEBUGINFOS)
             {
 			    printf("data allocated and arr structure written\n");
@@ -264,8 +264,9 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 					for (unsigned char sample = 0; sample < imgObj->SamplesPerPixel; sample++)
 					{
 						unsigned int arrptr = (perRowBytes * y) + (((x * BitsPerSample * imgObj->SamplesPerPixel) + (sample * BitsPerSample)) / 8);
-						unsigned long LeftJustifiedSubpixelLuminocity = temp_imgData[arrptr] << ((((x * imgObj->SamplesPerPixel * BitsPerSample) + (sample * imgObj->SamplesPerPixel)) % 8) + 24);
-						for (unsigned int i = 1; i < (BitsPerSample / 8) + 1; i++)
+						//unsigned long LeftJustifiedSubpixelLuminocity = temp_imgData[arrptr] << ((((x * imgObj->SamplesPerPixel * BitsPerSample) + (sample * imgObj->SamplesPerPixel)) % 8) + 24);
+						unsigned long LeftJustifiedSubpixelLuminocity = 0;
+						for (unsigned int i = 0; i < (BitsPerSample / 8) + 1; i++)
 						{
 							LeftJustifiedSubpixelLuminocity |= temp_imgData[arrptr + i] << 32 - ((i + 1) * 8);
 						}
