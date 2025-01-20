@@ -1,7 +1,9 @@
 #!/bin/bash
 
+set -e
+
 echo "compiling cuda library with nvcc"
-/usr/local/cuda/bin/nvcc /home/user/tiff_file_parser/libs/cuda_acceleration.cu -Xcompiler "-fPIC" -o /home/user/tiff_file_parser/libs/cuda_acceleration.o -c -g
+/usr/local/cuda/bin/nvcc $(pwd)/libs/cuda_acceleration.cu -Xcompiler "-fPIC" -o $(pwd)/libs/cuda_acceleration.o -c -g
 
 echo "compiling tiff lib with gcc"
 gcc libs/tiff.c -lm -o libs/tiff.o -c -g
