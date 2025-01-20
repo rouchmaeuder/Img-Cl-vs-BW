@@ -50,7 +50,9 @@ int main(int argc, char * argv[])
 	filepath = readdir(imgDir);
 	while (filepath != NULL)
 	{
-		if((strstr(filepath->d_name, ".tif") != NULL) && (filepath->d_type == DT_REG)) // search folder for .tif files and store their paths in filePathArr. store the amount of files found in filenum
+		char * DotTifPos = strstr(filepath->d_name, ".tif");
+		//printf("why %li \n", ((filepath->d_name + strlen(filepath->d_name)) - DotTifPos));
+		if((DotTifPos != NULL) && ((filepath->d_name + strlen(filepath->d_name)) - DotTifPos) < 5 && (filepath->d_type == DT_REG)) // search folder for .tif files and store their paths in filePathArr. store the amount of files found in filenum
 		{
 			if(filenum)
 			{
