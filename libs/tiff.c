@@ -28,12 +28,18 @@ enum compression_Type
 
 enum verbosityLevel VerboseFlag = 0;
 
-static unsigned char freadchar(FILE *file, unsigned long offset);																	   // Reads a unsigned char out of a file at a specified offset within
-static unsigned int freadint(FILE *file, unsigned long offset);																	   // Reads a unsigned integer out of a file at a specified offset within
-static unsigned long freadlong(FILE *file, unsigned long offset);																	   // Reads a unsigned long out of a file at a specified offset within
-static unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry);															   // Reads up to a unsigned long out of an IFD
+enum endianness 
+{
+	big,
+	little
+} parserEndianness = little;
+
+static unsigned char freadchar(FILE *file, unsigned long offset);																	  // Reads a unsigned char out of a file at a specified offset within
+static unsigned int freadint(FILE *file, unsigned long offset);																	      // Reads a unsigned integer out of a file at a specified offset within
+static unsigned long freadlong(FILE *file, unsigned long offset);																	  // Reads a unsigned long out of a file at a specified offset within
+static unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry);															  // Reads up to a unsigned long out of an IFD
 static unsigned long IFDReadEntry(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, unsigned int IFD_Entry_count, unsigned int tag); // Reads up to a unsigned long out of an IFD with a specified tag out of an array of IFD_entry types
-static unsigned long fillLongInt(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen);				   // deprecated method to uncompress back to back data compression
+static unsigned long fillLongInt(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen);				  // deprecated method to uncompress back to back data compression
 static void printStatusBar(unsigned char input);	
 
 enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char filePath [])
@@ -62,9 +68,10 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 		{
 			if (VerboseFlag & ERRORS)
 			{
-				printf("file is in big endian. this is currently not supported \n");
+				printf("file is in big endian. support in developement \n");
 			}
-			errorflags |= 0x04;
+			//errorflags |= 0x04;
+			parserEndianness = big;
 		}
 	}
 
@@ -226,7 +233,7 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 		{
 			if(VerboseFlag & ERRORS)
 			{
-				printf("more than 1 strip not supported");
+				printf("more than 1 strip not supported \n");
 			}
 			errorflags |= 0x10;
 		}
@@ -266,9 +273,11 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 						unsigned int arrptr = (perRowBytes * y) + (((x * BitsPerSample * imgObj->SamplesPerPixel) + (sample * BitsPerSample)) / 8);
 						//unsigned long LeftJustifiedSubpixelLuminocity = temp_imgData[arrptr] << ((((x * imgObj->SamplesPerPixel * BitsPerSample) + (sample * imgObj->SamplesPerPixel)) % 8) + 24);
 						unsigned long LeftJustifiedSubpixelLuminocity = 0;
-						for (unsigned int i = 0; i < (BitsPerSample / 8) + 1; i++)
+						__uint32_t count = (BitsPerSample / 8) + 1;
+						for (unsigned int i = 0; i < count; i++)
 						{
-							LeftJustifiedSubpixelLuminocity |= temp_imgData[arrptr + i] << 32 - ((i + 1) * 8);
+							if (parserEndianness ==  little) LeftJustifiedSubpixelLuminocity |= temp_imgData[arrptr + i] << 32 - ((i + 1) * 8);
+							if (parserEndianness == big)	 LeftJustifiedSubpixelLuminocity |= temp_imgData[arrptr + (count - i)] << 32 - (((count - i) + 1) * 8);
 						}
 
 						LeftJustifiedSubpixelLuminocity &= (0xffffffff << (32 - BitsPerSample));
@@ -425,15 +434,21 @@ static unsigned char freadchar(FILE *file, unsigned long offset)
 
 static unsigned int freadint(FILE *file, unsigned long offset)
 {
-	return (unsigned int)freadchar(file, offset) | ((unsigned int)freadchar(file, offset + 1) << 8);
+	if (parserEndianness == little) return (unsigned int)freadchar(file, offset) | ((unsigned int)freadchar(file, offset + 1) << 8);
+	if (parserEndianness == little) return (unsigned int)freadchar(file, offset + 1) | ((unsigned int)freadchar(file, offset) << 8);
 }
 
 static unsigned long freadlong(FILE *file, unsigned long offset)
 {
-	return (((unsigned long)freadchar(file, offset)) |
-			((unsigned int)freadchar(file, offset + 1) << 8) |
-			((unsigned int)freadchar(file, offset + 2) << 16) |
-			((unsigned int)freadchar(file, offset + 3) << 24));
+	if (parserEndianness == little) return  (((unsigned long)freadchar(file, offset)) |
+											((unsigned long)freadchar(file, offset + 1) << 8) |
+											((unsigned long)freadchar(file, offset + 2) << 16) |
+											((unsigned long)freadchar(file, offset + 3) << 24));
+											
+	if (parserEndianness == big)    return  (((unsigned long)freadchar(file, offset + 3)) |
+											((unsigned long)freadchar(file, offset + 2) << 8) |
+											((unsigned long)freadchar(file, offset + 1) << 16) |
+											((unsigned long)freadchar(file, offset) << 24));
 }
 
 static unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry)
