@@ -43,6 +43,11 @@ float cppParalellTotalContrast(float **image, float radius, unsigned int vResolu
 		printf("trying to allocate %i vars of type float* with sizeof %li resulting in %li bytes allocated \n", hResolution, sizeof(float*), sizeof(float*) * hResolution);
 	}
 
+	if (radius * hResolution <= 1)
+	{
+		return NAN;
+	}
+
 	if(cudaSuccess != cudaMalloc(&cu_image, sizeof(float*) * hResolution)) //setup 1st dimention input array
 	{
 		if(VerboseFlag & ERRORS)
