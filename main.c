@@ -3,11 +3,7 @@
 #include "dirent.h"
 #include "string.h"
 #include "libs/tiff.h"
-//#include <gtk/gtk.h>
 
-// compile with gcc main.c -lm -o main.o 
-// link with 	gcc main.o libs/cuda_acceleration.o -lcudart -L/usr/local/cuda/lib64 -lm -o a.out
-// total command /usr/local/cuda/bin/nvcc /home/user/tiff_file_parser/libs/cuda_acceleration.cu -Xcompiler "-fPIC" -o /home/user/tiff_file_parser/libs/cuda_acceleration.o -c && gcc main.c -lm -o main.o -c && gcc main.o libs/cuda_acceleration.o -lcudart -L/usr/local/cuda/lib64 -lm -lstdc++ -v -o a.out
 
 #define ANSI_RESET "\x1b[0m"
 #define ANSI_WHITE_BKGRND "\x1b[30;107m"
@@ -23,7 +19,6 @@ float totalContrast(float **image, float radius); // calculate contrast
 
 struct tiff * currentImgPtr;
 
-//static void openWindow (GtkApplication * app);
 
 int main(int argc, char * argv[])
 {
@@ -51,7 +46,6 @@ int main(int argc, char * argv[])
 	while (filepath != NULL)
 	{
 		char * DotTifPos = strstr(filepath->d_name, ".tif");
-		//printf("why %li \n", ((filepath->d_name + strlen(filepath->d_name)) - DotTifPos));
 		if((DotTifPos != NULL) && ((filepath->d_name + strlen(filepath->d_name)) - DotTifPos) < 6 && (filepath->d_type == DT_REG)) // search folder for .tif files and store their paths in filePathArr. store the amount of files found in filenum
 		{
 			if(filenum)
@@ -82,9 +76,10 @@ int main(int argc, char * argv[])
 	free(outputFilePath);
 
 	printf("outputfile created\n");
+	printf("\n  ");
 
 	struct tiff img;
-//	VerboseFlag = PrintErrors;
+
 	for (unsigned char i = 0; i < filenum; i++) // loop over all filepaths
 	{
 		if(openTiff(&img, 1, filePathArr[i]) != 0) // open the image
@@ -93,23 +88,18 @@ int main(int argc, char * argv[])
 		} else {
 			currentImgPtr = &img;
 			fprintf(outFile,"%s", filePathArr[i]);
-			for (__uint16_t i = 0; i < 8; i++)
+			for (__uint16_t j = 0; j < 8; j++)
 			{
-				float contrastVal = ParalellTotalContrast(img.BW_Data, powf(2, ((0-4)-i)), img.vResolution, img.hResolution); // analyze the image
+				printf("\r \bfile %i of %i, pass %i of 8\n", i, filenum, j);
+				float contrastVal = ParalellTotalContrast(img.BW_Data, powf(2, ((0-4)-j)), img.vResolution, img.hResolution); // analyze the image
 				fprintf(outFile, ", %f", contrastVal);
 			}
 			fprintf(outFile,"\n");
 
-	//		float contrastVal = 0.5;
 			currentImgPtr = &img;
-	//		g_autoptr(GtkApplication) imgPrev = gtk_application_new(NULL, 0);
-	//		g_signal_connect(imgPrev, "activate", G_CALLBACK(openWindow), NULL);
-	//		g_application_run (G_APPLICATION (imgPrev), /*argc*/ 0, /*argv*/ 0);
 			
 			closeTiff(&img); // close the image
 			
-		//	printf("total contrast is %f\n", contrastVal); // print the resolution to console
-		//	fprintf(outFile,"%s, %f \n", filePathArr[i], contrastVal); // print result to file
 			free(filePathArr[i]); // free the filepath array
 		}
 	}
@@ -120,59 +110,6 @@ int main(int argc, char * argv[])
 	return 0;
 }
 
-/*static void openWindow (GtkApplication * app)
-{
-	GtkWindow * window;
-	GtkWidget * image;
-	unsigned char * arr;
-	unsigned int i = 0;
-	float max = 0;
-	float min = 1000;
-	window = GTK_WINDOW(gtk_application_window_new(app));
-	image = gtk_picture_new();
-	gtk_window_set_child(window, image);
-	
-	arr = malloc(PREVIEWWINDOWRES * PREVIEWWINDOWRES * 3);
-	uint32_t yprevres = (float)PREVIEWWINDOWRES / ((float)currentImgPtr->hResolution/(float)currentImgPtr->vResolution);
-	for (uint32_t y = 0; y < yprevres; y++)
-	{
-		for (uint32_t x = 0; x < PREVIEWWINDOWRES; x++)
-		{
-			uint32_t xreadout = (((float)x+0.5)/(float)PREVIEWWINDOWRES)*currentImgPtr->hResolution;
-			uint32_t yreadout = (((float)y+0.5)/(float)PREVIEWWINDOWRES)*currentImgPtr->hResolution;
-			if (xreadout > currentImgPtr->hResolution || yreadout > currentImgPtr->vResolution)
-			{
-				printf("x= %i, y= %i;	hres= %li, vres= %li \n", xreadout, yreadout, currentImgPtr->hResolution, currentImgPtr->vResolution);
-			}
-			else
-			{
-				for (unsigned char color = 0; color < 3; color++)
-				{
-					float temp = currentImgPtr->RGB_Data[color][xreadout][yreadout];
-				
-					if (temp > max)
-					{
-						max = temp;
-					}
-					if (temp < min)
-					{
-						min = temp;
-					}
-					
-					arr[i] = limit((int)((temp) * 254.9), 0, 0xff);
-					i++;
-				}
-			}
-		}
-	}
-
-	printf("max = %f min = %f \n", max, min);
-	
-	gtk_picture_set_paintable(image, GDK_PAINTABLE(gdk_memory_texture_new(PREVIEWWINDOWRES, yprevres, GDK_MEMORY_R8G8B8, g_bytes_new(arr, PREVIEWWINDOWRES*PREVIEWWINDOWRES*3),PREVIEWWINDOWRES*3)));
-	free(arr);
-
-	gtk_window_present(window);
-}*/
 
 void printStatusBar(unsigned char input)
 {

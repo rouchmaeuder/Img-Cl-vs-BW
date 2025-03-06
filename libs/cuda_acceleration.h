@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-float   ParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution);
+float ParalellTotalContrast(float **image, float radius, unsigned int vResolution, unsigned int hResolution);
 
 #ifdef __cplusplus
 }

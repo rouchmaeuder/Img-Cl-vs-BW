@@ -7,8 +7,6 @@
 #define BLOCKS		/*((hResolution * vResolution)/1024)*/ 7
 #define THREADS		1024
 
-#define FILTERQUALITY 40
-#define CUTOFF 0.8
 
 // compile with  /usr/local/cuda/bin/nvcc /home/user/tiff_file_parser/libs/cuda_acceleration.cu -o /home/user/tiff_file_parser/cuda_acceleration.o -c
 
