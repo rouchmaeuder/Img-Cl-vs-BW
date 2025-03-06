@@ -9,7 +9,7 @@ echo "compiling tiff lib with gcc"
 gcc libs/tiff.c -lm -o libs/tiff.o -c -g
 
 echo "compiling main with gcc"
-gcc main.c `pkg-config gtk4 --cflags` `pkg-config gtk4 --libs` -lm -o main.o -c -g
+gcc main.c -lm -o main.o -c -g
 
 echo "linking"
 gcc main.o libs/tiff.o libs/cuda_acceleration.o `pkg-config gtk4 --libs` -lcudart -L/usr/local/cuda/lib64 -lm -lstdc++ -o a.out

@@ -40,7 +40,7 @@ static unsigned long freadlong(FILE *file, unsigned long offset);															
 static unsigned long IFDReadInteger(FILE *file, struct IFD_Entry Entry);															  // Reads up to a unsigned long out of an IFD
 static unsigned long IFDReadEntry(FILE *file, struct IFD_Entry *IFD_entries_arr_ptr, unsigned int IFD_Entry_count, unsigned int tag); // Reads up to a unsigned long out of an IFD with a specified tag out of an array of IFD_entry types
 static unsigned long fillLongInt(FILE *file, unsigned long ZoneOffset, unsigned long bitOffset, unsigned char bitlen);				  // deprecated method to uncompress back to back data compression
-static void printStatusBar(unsigned char input);	
+static void printStatusBar(unsigned char input);																					  // prints a statusbar to the standard output
 
 enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char filePath [])
 {
@@ -271,7 +271,6 @@ enum errorType openTiff(struct tiff* imgObj, unsigned char ConstructBwFlag, char
 					for (unsigned char sample = 0; sample < imgObj->SamplesPerPixel; sample++)
 					{
 						unsigned int arrptr = (perRowBytes * y) + (((x * BitsPerSample * imgObj->SamplesPerPixel) + (sample * BitsPerSample)) / 8);
-						//unsigned long LeftJustifiedSubpixelLuminocity = temp_imgData[arrptr] << ((((x * imgObj->SamplesPerPixel * BitsPerSample) + (sample * imgObj->SamplesPerPixel)) % 8) + 24);
 						unsigned long LeftJustifiedSubpixelLuminocity = 0;
 						__uint32_t count = (BitsPerSample / 8) + 1;
 						for (unsigned int i = 0; i < count; i++)
